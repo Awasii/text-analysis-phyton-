@@ -1,0 +1,108 @@
+"Importing packeges"
+import re
+import string
+from random import random
+
+import pandas as pd
+from nltk.corpus import stopwords
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.linear_model import LogisticRegression
+
+"Loading data and displaying max columns and rows"
+pd.set_option('display.max_columns', None)
+pd.set_option('display.max_rows', None)
+
+"Loading and naming the data"
+rating_data = pd.read_csv("C:\\Users\\caleb\\PycharmProjects\\pythonProject4\\Books_rating.csv", nrows=500)
+print(rating_data.columns)
+rating_data.columns = ['Id', 'Title', 'Price', 'User_id', 'profileName', 'review/helpfulness',
+                       'review_score', 'review/time', 'review_summary', 'review_text']
+
+"Dropping Null values in the selected columns"
+rating_data.dropna(subset=['review_score', 'review_summary', 'Title'], inplace=True)
+print("***Number of Rows:", len(rating_data))
+print()
+
+"Creating new sub dataframe with the most important columns"
+subDf_rating = rating_data[['review_score', 'review_summary', 'Title']]
+print(subDf_rating.head)
+print()
+
+"removing puncuation from data"
+
+import nltk
+
+nltk.download('stopwords')
+
+
+def remove_punc_stopwords(text):
+    text = re.sub(f"[{string.punctuation}]", " ", text)
+    text_tokens = set(text.split())
+    stops = set(stopwords.words('english'))
+    text_tokens = text_tokens.difference(stops)
+    return " ".join(text_tokens)
+
+
+text1 = """Hello good sir, my name is Calebe"""
+print(text1)
+print(remove_punc_stopwords(text1))
+
+"removing punctuation and stopwords from text data in review_summary and title "
+subDf_rating['Title'] = subDf_rating['Title'].apply(remove_punc_stopwords)
+subDf_rating['review_Summary'] = subDf_rating['review_summary'].apply(remove_punc_stopwords)
+
+""" Add a new variable called sentiment; if Rating is greater than 3, then sentiment = 1, else sentiment = -1 """
+subDf_rating['sentiment'] = [1 if x>3 else -1 for x in subDf_rating.review_score]
+
+import random
+
+"splitting the data using random data"
+subDf_rating['random_index'] = [ random.uniform(0,1) for x in range(len(subDf_rating))]
+
+train_rating = subDf_rating[subDf_rating.random_index < 0.85]
+test_rating = subDf_rating[subDf_rating.random_index >= 0.85]
+
+print(train_rating.head())
+print(test_rating.head())
+
+"Transforming text in data into a 'bag of words' using vectorizer function"
+vectorizer = CountVectorizer(token_pattern=r'\b\w+\b')
+train_matrix = vectorizer.fit_transform(train_rating['Title'])
+test_matrix = vectorizer.transform(test_rating['Title'])
+
+
+"performing logistic regression for prediction"
+lr = LogisticRegression()
+
+X_train = train_matrix
+X_test = test_matrix
+y_train = train_rating['sentiment']
+y_test = test_rating['sentiment']
+
+
+lr.fit(X_train,y_train)
+
+"With the logistic regression to then generate the predictions for the test dataset"
+predictions = lr.predict(X_test)
+test_rating['predictions'] = predictions
+print(test_rating.head(30))
+
+"Calculate the accuracy of the prediction"
+test_rating['match'] = test_rating['sentiment'] == test_rating['predictions']
+print(sum(test_rating['match'])/len(test_rating))
+
+lr2 = LogisticRegression()
+X_train = train_matrix
+X_test = test_matrix
+y_train2 = train_rating['review_score']
+y_test2 = test_rating['review_score']
+
+lr2.fit(X_train,y_train2)
+
+"Generating the predictions for the data set"
+predictions2 = lr2.predict(X_test)
+test_rating['predictions_rating'] = predictions2
+print(test_rating.head(30))
+
+test_rating['match_rating'] = test_rating['review_score'] == test_rating['predictions_rating']
+print(sum(test_rating['match_rating'])/len(test_rating))
